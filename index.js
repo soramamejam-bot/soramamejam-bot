@@ -23,4 +23,16 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
+const express = require('express');
+const app = express();
+const port = 3000;
+
+app.get('/', (req, res) => {
+    res.send('Bot is running! 🤖');
+});
+
+app.listen(port, () => {
+    console.log(`Webサーバーがポート ${port} で起動しました！`);
+});
+
 client.login(process.env.DISCORD_TOKEN);
