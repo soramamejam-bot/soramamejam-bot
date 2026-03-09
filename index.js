@@ -62,10 +62,19 @@ app.listen(port, () => {
 
 console.log('今からDiscordにログインを試みます...');
 
+console.log('--- ログイン試行開始 ---');
+
+// 5秒経っても反応がない場合にメッセージを出す
+const timer = setTimeout(() => {
+    console.log('⚠️ 5秒経過：まだ応答がありません。トークンか権限設定が怪しいです。');
+}, 5000);
+
 client.login(process.env.DISCORD_TOKEN.trim())
-  .then(() => {
-    console.log('ログイン処理自体は成功しました！');
-  })
-  .catch((error) => {
-    console.error('ログインに失敗しました。原因はこちら：', error);
-  });
+    .then(() => {
+        clearTimeout(timer);
+        console.log('✅ ログイン成功！');
+    })
+    .catch(err => {
+        clearTimeout(timer);
+        console.error('❌ ログイン失敗！エラー内容:', err.message);
+    });
