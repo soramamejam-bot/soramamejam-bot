@@ -1,35 +1,53 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
+const { createOmikujiResponse } = require('./omikuji.js');
 
-// --- 1. Webサーバーの設定 (Renderの稼働維持用) ---
+// --- 1. Webサーバー (Render維持用) ---
 const app = express();
 app.get('/', (req, res) => res.send('Bot is running! 🤖'));
-app.listen(3000, () => console.log('Webサーバー起動完了 (Port: 3000)'));
+app.listen(3000, () => console.log('Webサーバー起動中'));
 
-// --- 2. Discord Botの設定 (最小限の権限) ---
+// --- 2. Botの設定 (おみくじに必要な権限) ---
 const client = new Client({ 
-    intents: [ GatewayIntentBits.Guilds ] 
+    intents: [ 
+        GatewayIntentBits.Guilds,
+        // スラッシュコマンドだけならGuildsだけでOKです
+    ] 
 });
 
-// 詳細ログを表示して原因を突き止める
-client.on('debug', m => console.log('詳細ログ:', m));
-client.on('error', e => console.error('重大なエラー:', e));
-
-client.once('ready', (c) => {
+// ログイン完了時の処理 (警告が出ないよう clientReady を使用)
+client.once('clientReady', (c) => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`✅ ログイン成功！`);
-    console.log(`Bot名: ${c.user.tag}`);
+    console.log(`✅ おみくじボット稼働開始！`);
+    console.log(`ログイン名: ${c.user.tag}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });
 
-// --- 3. ログイン実行 ---
-console.log('今からDiscordにログインを試みます...');
+// おみくじの反応処理
+// ... (上の部分は省略)
 
-client.login(process.env.DISCORD_TOKEN?.trim())
-    .catch(err => {
-        console.error('❌ ログイン失敗:', err.message);
-        if (err.message.includes('TOKEN_INVALID')) {
-            console.error('ヒント: トークンが間違っているか、コピペミス（前後の空白など）の可能性があります。');
+client.on('interactionCreate', async interaction => {
+    // スラッシュコマンド、またはユーザーコマンド（アプリボタン）が押されたかチェック
+    const isCommand = interaction.isChatInputCommand() && interaction.commandName === 'omikuji';
+    const isAppButton = interaction.isUserContextMenuCommand() && interaction.commandName === 'おみくじを引く';
+    const isRetryButton = interaction.isButton() && interaction.customId === 'retry_omikuji';
+
+    if (isCommand || isAppButton || isRetryButton) {
+        try {
+            // おみくじの結果を生成
+            const response = createOmikujiResponse(interaction.user);
+
+            if (isRetryButton) {
+                await interaction.update(response);
+            } else {
+                await interaction.reply(response);
+            }
+        } catch (error) {
+            console.error('エラー発生:', error);
         }
-    });
+    }
+});
+
+// --- 3. ログイン ---
+client.login(process.env.DISCORD_TOKEN?.trim());
