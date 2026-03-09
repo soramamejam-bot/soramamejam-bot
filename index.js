@@ -1,89 +1,35 @@
 require('dotenv').config();
-console.log('実行中のNode.jsバージョン:', process.version);
-console.log('診断：トークンは存在しますか？ ->', process.env.DISCORD_TOKEN ? 'はい' : 'いいえ、空っぽです');
 const { Client, GatewayIntentBits } = require('discord.js');
-// 1. さっき作ったおみくじ職人を呼び出す
-const { createOmikujiResponse } = require('./omikuji.js');
+const express = require('express');
 
+// --- 1. Webサーバーの設定 (Renderの稼働維持用) ---
+const app = express();
+app.get('/', (req, res) => res.send('Bot is running! 🤖'));
+app.listen(3000, () => console.log('Webサーバー起動完了 (Port: 3000)'));
+
+// --- 2. Discord Botの設定 (最小限の権限) ---
 const client = new Client({ 
-    intents: [
-        GatewayIntentBits.Guilds // 一旦これだけにする
-    ] 
+    intents: [ GatewayIntentBits.Guilds ] 
 });
 
-// 全てのイベントを監視してログに出す
-client.on('raw', packet => {
-    if (packet.t === 'READY') console.log('✅ READYパケットを受信しました！');
-});
-
+// 詳細ログを表示して原因を突き止める
 client.on('debug', m => console.log('詳細ログ:', m));
-
 client.on('error', e => console.error('重大なエラー:', e));
 
-client.on('debug', (info) => {
-    console.log('デバッグ情報:', info);
+client.once('ready', (c) => {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`✅ ログイン成功！`);
+    console.log(`Bot名: ${c.user.tag}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });
 
-client.once('clientReady', (c) => {
-    console.log(`整理整頓完了！ ${c.user.tag} が起動しました！`); 
-});
-
-// ついでにエラーイベントも監視します（適当な場所に追加）
-client.on('error', (err) => {
-    console.error('Discordクライアントエラー:', err);
-});
-
-client.on('shardError', error => {
-    console.error('WebSocket接続エラー:', error);
-});
-
-process.on('unhandledRejection', error => {
-    console.error('予期せぬエラー:', error);
-});
-
-client.on('interactionCreate', async interaction => {
-    // 2. コマンドかボタンかを判別して、おみくじレスポンスを投げるだけ！
-    const isOmikujiCommand = interaction.isChatInputCommand() && interaction.commandName === 'omikuji';
-    const isRetryButton = interaction.isButton() && interaction.customId === 'retry_omikuji';
-
-    if (isOmikujiCommand || isRetryButton) {
-        const response = createOmikujiResponse(interaction.user);
-
-        if (isRetryButton) {
-            await interaction.update(response);
-        } else {
-            await interaction.reply(response);
-        }
-    }
-});
-
-const express = require('express');
-const app = express();
-const port = 3000;
-
-app.get('/', (req, res) => {
-    res.send('Bot is running! 🤖');
-});
-
-app.listen(port, () => {
-    console.log(`Webサーバーがポート ${port} で起動しました！`);
-});
-
+// --- 3. ログイン実行 ---
 console.log('今からDiscordにログインを試みます...');
 
-console.log('--- ログイン試行開始 ---');
-
-// 5秒経っても反応がない場合にメッセージを出す
-const timer = setTimeout(() => {
-    console.log('⚠️ 5秒経過：まだ応答がありません。トークンか権限設定が怪しいです。');
-}, 5000);
-
-client.login(process.env.DISCORD_TOKEN.trim())
-    .then(() => {
-        clearTimeout(timer);
-        console.log('✅ ログイン成功！');
-    })
+client.login(process.env.DISCORD_TOKEN?.trim())
     .catch(err => {
-        clearTimeout(timer);
-        console.error('❌ ログイン失敗！エラー内容:', err.message);
+        console.error('❌ ログイン失敗:', err.message);
+        if (err.message.includes('TOKEN_INVALID')) {
+            console.error('ヒント: トークンが間違っているか、コピペミス（前後の空白など）の可能性があります。');
+        }
     });
