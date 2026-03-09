@@ -15,14 +15,6 @@ client.once('ready', () => {
     console.log('整理整頓完了！Bot起動！'); 
 });
 
-client.login(process.env.DISCORD_TOKEN)
-    .then(() => {
-        console.log('ログイン成功！');
-    })
-    .catch((err) => {
-        console.error('ログイン失敗の原因:', err); // これでエラー内容がログに出ます
-    });
-
 // ついでにエラーイベントも監視します（適当な場所に追加）
 client.on('error', (err) => {
     console.error('Discordクライアントエラー:', err);
@@ -55,3 +47,11 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Webサーバーがポート ${port} で起動しました！`);
 });
+
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => {
+    console.log('ログイン処理自体は成功しました！');
+  })
+  .catch((error) => {
+    console.error('ログインに失敗しました。原因はこちら：', error);
+  });
