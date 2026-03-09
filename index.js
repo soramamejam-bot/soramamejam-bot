@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log('実行中のNode.jsバージョン:', process.version);
 console.log('診断：トークンは存在しますか？ ->', process.env.DISCORD_TOKEN ? 'はい' : 'いいえ、空っぽです');
 const { Client, GatewayIntentBits } = require('discord.js');
 // 1. さっき作ったおみくじ職人を呼び出す
@@ -21,6 +22,14 @@ client.once('clientReady', (c) => {
 // ついでにエラーイベントも監視します（適当な場所に追加）
 client.on('error', (err) => {
     console.error('Discordクライアントエラー:', err);
+});
+
+client.on('shardError', error => {
+    console.error('WebSocket接続エラー:', error);
+});
+
+process.on('unhandledRejection', error => {
+    console.error('予期せぬエラー:', error);
 });
 
 client.on('interactionCreate', async interaction => {
