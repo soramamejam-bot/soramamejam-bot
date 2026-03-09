@@ -4,8 +4,13 @@ const { Client, GatewayIntentBits } = require('discord.js');
 // 1. さっき作ったおみくじ職人を呼び出す
 const { createOmikujiResponse } = require('./omikuji.js');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
+const client = new Client({ 
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages, // メッセージを扱うなら必須
+        GatewayIntentBits.MessageContent // メッセージの中身を読むなら必須
+    ] 
+});
 client.once('ready', () => {
     console.log('整理整頓完了！Bot起動！'); 
 });
