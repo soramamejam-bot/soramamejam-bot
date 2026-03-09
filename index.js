@@ -10,7 +10,18 @@ client.once('ready', () => {
     console.log('整理整頓完了！Bot起動！'); 
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => {
+        console.log('ログイン成功！');
+    })
+    .catch((err) => {
+        console.error('ログイン失敗の原因:', err); // これでエラー内容がログに出ます
+    });
+
+// ついでにエラーイベントも監視します（適当な場所に追加）
+client.on('error', (err) => {
+    console.error('Discordクライアントエラー:', err);
+});
 
 client.on('interactionCreate', async interaction => {
     // 2. コマンドかボタンかを判別して、おみくじレスポンスを投げるだけ！
