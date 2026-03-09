@@ -11,6 +11,15 @@ const client = new Client({
     ] 
 });
 
+// 全てのイベントを監視してログに出す
+client.on('raw', packet => {
+    if (packet.t === 'READY') console.log('✅ READYパケットを受信しました！');
+});
+
+client.on('debug', m => console.log('詳細ログ:', m));
+
+client.on('error', e => console.error('重大なエラー:', e));
+
 client.on('debug', (info) => {
     console.log('デバッグ情報:', info);
 });
