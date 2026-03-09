@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log('診断：トークンは存在しますか？ ->', process.env.DISCORD_TOKEN ? 'はい' : 'いいえ、空っぽです');
 const { Client, GatewayIntentBits } = require('discord.js');
 // 1. さっき作ったおみくじ職人を呼び出す
 const { createOmikujiResponse } = require('./omikuji.js');
@@ -38,4 +39,3 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Webサーバーがポート ${port} で起動しました！`);
 });
-
