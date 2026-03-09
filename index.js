@@ -48,6 +48,8 @@ app.listen(port, () => {
     console.log(`Webサーバーがポート ${port} で起動しました！`);
 });
 
+console.log('今からDiscordにログインを試みます...');
+
 client.login(process.env.DISCORD_TOKEN)
   .then(() => {
     console.log('ログイン処理自体は成功しました！');
