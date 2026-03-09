@@ -6,9 +6,7 @@ const { createOmikujiResponse } = require('./omikuji.js');
 
 const client = new Client({ 
     intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages, // メッセージを扱うなら必須
-        GatewayIntentBits.MessageContent // メッセージの中身を読むなら必須
+        GatewayIntentBits.Guilds // 一旦これだけにする
     ] 
 });
 
