@@ -11,8 +11,13 @@ const client = new Client({
         GatewayIntentBits.MessageContent // メッセージの中身を読むなら必須
     ] 
 });
-client.once('ready', () => {
-    console.log('整理整頓完了！Bot起動！'); 
+
+client.on('debug', (info) => {
+    console.log('デバッグ情報:', info);
+});
+
+client.once('clientReady', (c) => {
+    console.log(`整理整頓完了！ ${c.user.tag} が起動しました！`); 
 });
 
 // ついでにエラーイベントも監視します（適当な場所に追加）
@@ -50,7 +55,7 @@ app.listen(port, () => {
 
 console.log('今からDiscordにログインを試みます...');
 
-client.login(process.env.DISCORD_TOKEN)
+client.login(process.env.DISCORD_TOKEN.trim())
   .then(() => {
     console.log('ログイン処理自体は成功しました！');
   })
