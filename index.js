@@ -24,27 +24,39 @@ client.once('clientReady', (c) => {
 });
 
 client.on('interactionCreate', async interaction => {
+    // 判定用フラグ
     const isOmikuji = (interaction.isChatInputCommand() && interaction.commandName === 'omikuji') || 
-                      (interaction.isUserContextMenuCommand() && interaction.commandName === 'おみくじを引く') ||
-                      (interaction.isButton() && interaction.customId === 'retry_omikuji');
-
+                      (interaction.isUserContextMenuCommand() && interaction.commandName === 'おみくじを引く');
+    const isRetryButton = (interaction.isButton() && interaction.customId === 'retry_omikuji');
     const isChallenge = (interaction.isChatInputCommand() && interaction.commandName === 'challenge') || 
                         (interaction.isUserContextMenuCommand() && interaction.commandName === '今日のチャレンジ楽曲');
 
     try {
-        if (isOmikuji) {
+        // --- 1. まずはDiscordに「ちょっと待ってて（処理中）」と伝える ---
+        if (isRetryButton) {
+            // ボタンが押された場合は deferUpdate を使う
+            await interaction.deferUpdate();
+        } else if (isOmikuji || isChallenge) {
+            // スラッシュコマンドの場合は deferReply を使う（Discord上に「考え中...」と出ます）
+            await interaction.deferReply();
+        } else {
+            // 知らないコマンドなら何もしない
+            return;
+        }
+
+        // --- 2. ゆっくり結果を作ってから、返事を「編集」して表示する ---
+        if (isOmikuji || isRetryButton) {
             const response = createOmikujiResponse(interaction.user);
-            if (interaction.isButton()) await interaction.update(response);
-            else await interaction.reply(response);
+            await interaction.editReply(response); // reply ではなく editReply を使います
         } 
         else if (isChallenge) {
             const response = createChallengeResponse(interaction.user);
-            await interaction.reply(response);
+            await interaction.editReply(response); // reply ではなく editReply を使います
         }
+
     } catch (error) {
         console.error('インタラクションエラー:', error);
     }
 });
-
 // 5. ログイン
 client.login(process.env.DISCORD_TOKEN?.trim());
