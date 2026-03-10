@@ -1,16 +1,19 @@
 const { EmbedBuilder } = require('discord.js');
 
 // 楽曲リスト（ここを自由に増やしてください！）
-const songs = [
-    { title: "群青讃歌", artist: "Eve", difficulty: "26" },
-    { title: "アイディスマイル", artist: "とあ", difficulty: "25" },
-    { title: "トンデモワンダーズ", artist: "sasakure.UK", difficulty: "27" },
-    { title: "初音ミクの消失", artist: "cosMo@暴走P", difficulty: "30" },
-    { title: "ロウワー", artist: "ぬゆり", difficulty: "26" }
-];
+const songs = require('./songs.json'); // ここで外部ファイルからデータを読み込む
+
+function createChallengeResponse(user) {
+const songs = require('./songs.json');
 
 function createChallengeResponse(user) {
     const song = songs[Math.floor(Math.random() * songs.length)];
+    return {
+        content: `【今日のチャレンジ楽曲】\n楽曲名: **${song.title}**\n難易度: **${song.difficulty}**\nLv: **${song.Lv}**\n頑張ってください！`
+    };
+}
+module.exports = { createChallengeResponse };    // 以下は今まで通り
+}
 
     const embed = new EmbedBuilder()
         .setColor(0x32cd32) // ライムグリーン
@@ -25,6 +28,5 @@ function createChallengeResponse(user) {
         .setTimestamp();
 
     return { embeds: [embed] };
-}
-
+    
 module.exports = { createChallengeResponse };
