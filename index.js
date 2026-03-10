@@ -1,11 +1,29 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
+
+// 1. 関数の読み込み (ファイルの先頭の方で行う)
 const { createOmikujiResponse } = require('./omikuji.js');
-const { createChallengeResponse } = require('./challenge.js'); // 追加
+const { createChallengeResponse } = require('./challenge.js');
+
+// 2. Clientの初期化 (ここが client.on より先にないとエラーになります！)
+const client = new Client({ 
+    intents: [ GatewayIntentBits.Guilds ] 
+});
+
+// 3. Webサーバーの設定 (Render用)
+const app = express();
+app.get('/', (req, res) => res.send('Bot is running! 🤖'));
+app.listen(3000, () => console.log('Webサーバー起動中'));
+
+// 4. イベントハンドラー (client を作った後なので、ここで使ってOK！)
+client.once('clientReady', (c) => {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`✅ ボット稼働開始！: ${c.user.tag}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+});
 
 client.on('interactionCreate', async interaction => {
-    // 判定用フラグ
     const isOmikuji = (interaction.isChatInputCommand() && interaction.commandName === 'omikuji') || 
                       (interaction.isUserContextMenuCommand() && interaction.commandName === 'おみくじを引く') ||
                       (interaction.isButton() && interaction.customId === 'retry_omikuji');
@@ -24,54 +42,9 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply(response);
         }
     } catch (error) {
-        console.error('エラー:', error);
-    }
-});
-// --- 1. Webサーバー (Render維持用) ---
-const app = express();
-app.get('/', (req, res) => res.send('Bot is running! 🤖'));
-app.listen(3000, () => console.log('Webサーバー起動中'));
-
-// --- 2. Botの設定 (おみくじに必要な権限) ---
-const client = new Client({ 
-    intents: [ 
-        GatewayIntentBits.Guilds,
-        // スラッシュコマンドだけならGuildsだけでOKです
-    ] 
-});
-
-// ログイン完了時の処理 (警告が出ないよう clientReady を使用)
-client.once('clientReady', (c) => {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`✅ おみくじボット稼働開始！`);
-    console.log(`ログイン名: ${c.user.tag}`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-});
-
-// おみくじの反応処理
-// ... (上の部分は省略)
-
-client.on('interactionCreate', async interaction => {
-    // スラッシュコマンド、またはユーザーコマンド（アプリボタン）が押されたかチェック
-    const isCommand = interaction.isChatInputCommand() && interaction.commandName === 'omikuji';
-    const isAppButton = interaction.isUserContextMenuCommand() && interaction.commandName === 'おみくじを引く';
-    const isRetryButton = interaction.isButton() && interaction.customId === 'retry_omikuji';
-
-    if (isCommand || isAppButton || isRetryButton) {
-        try {
-            // おみくじの結果を生成
-            const response = createOmikujiResponse(interaction.user);
-
-            if (isRetryButton) {
-                await interaction.update(response);
-            } else {
-                await interaction.reply(response);
-            }
-        } catch (error) {
-            console.error('エラー発生:', error);
-        }
+        console.error('インタラクションエラー:', error);
     }
 });
 
-// --- 3. ログイン ---
+// 5. ログイン
 client.login(process.env.DISCORD_TOKEN?.trim());
