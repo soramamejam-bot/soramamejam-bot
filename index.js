@@ -2,29 +2,27 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 
-// 1. 関数の読み込み (ファイルの先頭の方で行う)
+// 各機能の読み込み
 const { createOmikujiResponse } = require('./omikuji.js');
 const { createChallengeResponse } = require('./challenge.js');
 
-// 2. Clientの初期化 (ここが client.on より先にないとエラーになります！)
 const client = new Client({ 
     intents: [ GatewayIntentBits.Guilds ] 
 });
 
-// 3. Webサーバーの設定 (Render用)
+// Renderの「スリープ」を防止するための簡易Webサーバー
 const app = express();
 app.get('/', (req, res) => res.send('Bot is running! 🤖'));
-app.listen(3000, () => console.log('Webサーバー起動中'));
+app.listen(3000, () => console.log('Webサーバー起動中 (Port 3000)'));
 
-// 4. イベントハンドラー (client を作った後なので、ここで使ってOK！)
-client.once('clientReady', (c) => {
+client.once('ready', (c) => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`✅ ボット稼働開始！: ${c.user.tag}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });
 
 client.on('interactionCreate', async interaction => {
-    // 判定用フラグ
+    // 判定ロジック
     const isOmikuji = (interaction.isChatInputCommand() && interaction.commandName === 'omikuji') || 
                       (interaction.isUserContextMenuCommand() && interaction.commandName === 'おみくじを引く');
     const isRetryButton = (interaction.isButton() && interaction.customId === 'retry_omikuji');
@@ -32,31 +30,37 @@ client.on('interactionCreate', async interaction => {
                         (interaction.isUserContextMenuCommand() && interaction.commandName === '今日のチャレンジ楽曲');
 
     try {
-        // --- 1. まずはDiscordに「ちょっと待ってて（処理中）」と伝える ---
+        // --- 1. 応答を確保 (3秒ルール対策) ---
         if (isRetryButton) {
-            // ボタンが押された場合は deferUpdate を使う
-            await interaction.deferUpdate();
+            await interaction.deferUpdate(); // ボタンは既存メッセージの更新
         } else if (isOmikuji || isChallenge) {
-            // スラッシュコマンドの場合は deferReply を使う（Discord上に「考え中...」と出ます）
-            await interaction.deferReply();
+            await interaction.deferReply(); // コマンドは新規返信（考え中...を表示）
         } else {
-            // 知らないコマンドなら何もしない
-            return;
+            return; // 知らないインタラクションは無視
         }
 
-        // --- 2. ゆっくり結果を作ってから、返事を「編集」して表示する ---
+        // --- 2. 各機能のレスポンス生成 ---
+        let response;
         if (isOmikuji || isRetryButton) {
-            const response = createOmikujiResponse(interaction.user);
-            await interaction.editReply(response); // reply ではなく editReply を使います
+            response = createOmikujiResponse(interaction.user);
         } 
         else if (isChallenge) {
-            const response = createChallengeResponse(interaction.user);
-            await interaction.editReply(response); // reply ではなく editReply を使います
+            response = createChallengeResponse(interaction.user);
+        }
+
+        // --- 3. 結果を表示 ---
+        if (response) {
+            await interaction.editReply(response);
         }
 
     } catch (error) {
-        console.error('インタラクションエラー:', error);
+        console.error('詳細なエラー情報:', {
+            code: error.code,
+            message: error.message,
+            command: interaction.commandName || interaction.customId
+        });
     }
 });
-// 5. ログイン
+
+// ログイン（トークンの前後の空白を除去）
 client.login(process.env.DISCORD_TOKEN?.trim());
