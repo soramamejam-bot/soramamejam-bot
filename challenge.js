@@ -20,7 +20,7 @@ function createChallengeResponse(user) {
         .addFields(
             { name: '曲名', value: `**${song.title}**`, inline: true },
             { name: 'アーティスト', value: song.artist, inline: true },
-            { name: '推奨難易度', value: `Lv.${song.difficulty}`, inline: false }
+            { name: '難易度', value: `Lv.${song.difficulty}`, inline: false }
         )
         .setTimestamp();
 
