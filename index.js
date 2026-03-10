@@ -2,7 +2,31 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 const { createOmikujiResponse } = require('./omikuji.js');
+const { createChallengeResponse } = require('./challenge.js'); // 追加
 
+client.on('interactionCreate', async interaction => {
+    // 判定用フラグ
+    const isOmikuji = (interaction.isChatInputCommand() && interaction.commandName === 'omikuji') || 
+                      (interaction.isUserContextMenuCommand() && interaction.commandName === 'おみくじを引く') ||
+                      (interaction.isButton() && interaction.customId === 'retry_omikuji');
+
+    const isChallenge = (interaction.isChatInputCommand() && interaction.commandName === 'challenge') || 
+                        (interaction.isUserContextMenuCommand() && interaction.commandName === '今日のチャレンジ楽曲');
+
+    try {
+        if (isOmikuji) {
+            const response = createOmikujiResponse(interaction.user);
+            if (interaction.isButton()) await interaction.update(response);
+            else await interaction.reply(response);
+        } 
+        else if (isChallenge) {
+            const response = createChallengeResponse(interaction.user);
+            await interaction.reply(response);
+        }
+    } catch (error) {
+        console.error('エラー:', error);
+    }
+});
 // --- 1. Webサーバー (Render維持用) ---
 const app = express();
 app.get('/', (req, res) => res.send('Bot is running! 🤖'));

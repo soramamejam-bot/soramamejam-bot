@@ -1,16 +1,20 @@
 const { REST, Routes, ApplicationCommandType } = require('discord.js');
 require('dotenv').config();
 
-const commands = [
     // 1. スラッシュコマンド (/omikuji)
+    const commands = [
+    // おみくじ（既存）
+    { name: 'omikuji', description: '今日のおみくじを引きます' },
+    { name: 'おみくじを引く', type: ApplicationCommandType.User },
+    
+    // --- ここから追加 ---
     {
-        name: 'omikuji',
-        description: '今日のおみくじを引きます',
+        name: 'challenge',
+        description: '今日のチャレンジライブ楽曲は？',
     },
-    // 2. アプリボタン (ユーザーコマンド)
     {
-        name: 'おみくじを引く',
-        type: ApplicationCommandType.User, // これでプロフィールなどの「アプリ」欄にボタンが出ます
+        name: '今日のチャレンジ楽曲',
+        type: ApplicationCommandType.User, // アプリボタン（ユーザーコマンド）
     }
 ];
 
