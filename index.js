@@ -13,9 +13,10 @@ const client = new Client({
 // Renderの「スリープ」を防止するための簡易Webサーバー
 const app = express();
 app.get('/', (req, res) => res.send('Bot is running! 🤖'));
-app.listen(3000, () => console.log('Webサーバー起動中 (Port 3000)'));
+const PORT = process.env.PORT || 10000; // Render指定のポート、なければ10000を使用
+app.listen(PORT, () => console.log(`Webサーバー起動中 (Port ${PORT})`));
 
-client.once('ready', (c) => {
+client.once('clientReady', (c) => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`✅ ボット稼働開始！: ${c.user.tag}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
