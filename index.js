@@ -67,8 +67,9 @@ client.on('interactionCreate', async interaction => {
 
     try {
         // ▼ 新しいコマンド：全員からロールを剥奪する
-        if (commandName === 'resetvc') {
-            await interaction.deferReply(); // 考え中...
+if (commandName === 'resetvc') {
+            // ▼カッコの中に { ephemeral: true } を入れる
+            await interaction.deferReply({ ephemeral: true }); // 考え中...
 
             const guild = interaction.guild;
             const role = await guild.roles.fetch(TARGET_ROLE_ID);
