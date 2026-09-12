@@ -1,34 +1,31 @@
-const { REST, Routes, ApplicationCommandType } = require('discord.js');
 require('dotenv').config();
+const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 
-    // 1. スラッシュコマンド (/omikuji)
-    const commands = [
-    // おみくじ（既存）
-    { name: 'omikuji', description: '今日のおみくじを引きます' },
-    { name: 'おみくじを引く', type: ApplicationCommandType.User },
-    
-    // --- ここから追加 ---
-    {
-        name: 'challenge',
-        description: '今日のチャレンジライブ楽曲は？',
-    },
-    {
-        name: '今日のチャレンジ楽曲',
-        type: ApplicationCommandType.User, // アプリボタン（ユーザーコマンド）
-    }
-];
+// ★ 新しいコマンドだけを定義します（古いものを書かないことで、メニューから削除されます）
+const commands = [
+    new SlashCommandBuilder()
+        .setName('resetvc')
+        .setDescription('全員のVC参加者ロールをまとめて外します'),
+].map(command => command.toJSON());
 
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN?.trim());
 
 (async () => {
     try {
-        console.log('コマンド登録中...');
+        console.log('コマンドの更新を開始します...');
+
+        // ボットのクライアントID（Application ID）を指定します
+        // .env に CLIENT_ID を設定していない場合は、下の '' の中に直接IDを貼り付けてください
+        const clientId = process.env.CLIENT_ID || 'ここにボットのCLIENT_IDを貼り付ける'; 
+
+        // グローバルコマンドとして上書き登録
         await rest.put(
-            Routes.applicationCommands(process.env.CLIENT_ID), // ここに自分のApplication IDが必要
+            Routes.applicationCommands(clientId),
             { body: commands },
         );
-        console.log('✅ コマンドの登録に成功しました！');
+
+        console.log('✅ 新しいコマンドの登録（と古いコマンドの削除）が完了しました！');
     } catch (error) {
-        console.error(error);
+        console.error('コマンド登録エラー:', error);
     }
 })();
