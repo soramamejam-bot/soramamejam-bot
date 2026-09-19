@@ -6,6 +6,41 @@ const commands = [
     new SlashCommandBuilder()
         .setName('resetvc')
         .setDescription('全員のVC参加者ロールをまとめて外します'),
+        // ▼ここから追加▼
+    new SlashCommandBuilder()
+        .setName('move')
+        .setDescription('指定したユーザーを見えないVCに強制移動させます')
+        .addUserOption(option => 
+            option.setName('target')
+                .setDescription('移動させるユーザー')
+                .setRequired(true)) // 必須項目にする
+        .addStringOption(option => 
+            option.setName('room')
+                .setDescription('移動先のVCを選択')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'VC 1', value: '0' },
+                    { name: 'VC 2', value: '1' },
+                    { name: 'VC 3', value: '2' }
+                )),
+                // ▼▼ ここから追加 ▼▼
+    new SlashCommandBuilder()
+        .setName('move_multi')
+        .setDescription('複数人をメンションで指定してVCに一斉移動させます')
+        .addStringOption(option => 
+            option.setName('targets')
+                .setDescription('移動させる人をメンションで指定（例: @A @B @C）')
+                .setRequired(true))
+        .addStringOption(option => 
+            option.setName('room')
+                .setDescription('移動先のVCを選択')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'VC 1', value: '0' },
+                    { name: 'VC 2', value: '1' },
+                    { name: 'VC 3', value: '2' }
+                ))
+    // ▲▲ ここまで追加 ▲▲
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN?.trim());

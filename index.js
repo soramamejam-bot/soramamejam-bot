@@ -90,7 +90,87 @@ if (commandName === 'resetvc') {
 
             await interaction.editReply(`✅ 処理完了！ ${removedCount} 人のユーザーからロールを外しました。`);
         } 
-        
+        // ▼ 新機能: ユーザーをVCへ強制移動させるコマンド
+        else if (commandName === 'move') {
+            await interaction.deferReply({ ephemeral: true }); // 運営の操作なので隠す
+
+            const targetUser = interaction.options.getUser('target');
+            const roomIndex = parseInt(interaction.options.getString('room')); 
+            
+            try {
+                // 対象のメンバー情報を取得
+                const targetMember = await interaction.guild.members.fetch(targetUser.id);
+                
+                // 対象者がどこかのVCに入っているかチェック
+                if (!targetMember.voice.channel) {
+                    return interaction.editReply(`❌ ${targetUser.username} さんは現在どのVCにも参加していないため、移動できません。（※事前にどこかのVCに入ってもらう必要があります）`);
+                }
+
+                // 設定エリアで定義した配列から、選ばれたVCのIDを取得
+                const targetVcId = TARGET_VC_IDS[roomIndex];
+                
+                // 強制移動を実行！
+                await targetMember.voice.setChannel(targetVcId);
+                
+                await interaction.editReply(`✅ ${targetUser.username} さんを VC ${roomIndex + 1} に強制移動させました！`);
+                
+            } catch (error) {
+                console.error('移動エラー:', error);
+                await interaction.editReply('❌ 移動に失敗しました。ボットのロールに「メンバーを移動（Move Members）」の権限があるか確認してください。');
+            }
+        }
+        // ▼ 新機能: 複数人をまとめてVCへ強制移動させるコマンド
+        else if (commandName === 'move_multi') {
+            await interaction.deferReply({ ephemeral: true });
+
+            const targetsString = interaction.options.getString('targets');
+            const roomIndex = parseInt(interaction.options.getString('room'));
+            const targetVcId = TARGET_VC_IDS[roomIndex];
+
+            // メンション文字列（<@1234...>）からIDだけを抽出する仕組み
+            const mentionRegex = /<@!?(\d+)>/g;
+            const userIds = [];
+            let match;
+            while ((match = mentionRegex.exec(targetsString)) !== null) {
+                userIds.push(match[1]); // IDの数字だけを配列に格納
+            }
+
+            // メンションが1つも認識できなかった場合
+            if (userIds.length === 0) {
+                return interaction.editReply('❌ メンションが正しく指定されていません。テキスト欄で `@ユーザー名` のように青く光る形式で入力してください。');
+            }
+
+            let successCount = 0;
+            let errorMessages = [];
+
+            // 抽出したIDを順番に処理していく
+            for (const userId of userIds) {
+                try {
+                    const targetMember = await interaction.guild.members.fetch(userId);
+                    
+                    // VCにいない人はスキップ
+                    if (!targetMember.voice.channel) {
+                        errorMessages.push(`⚠️ ${targetMember.user.username} さんはVCにいないためスキップしました。`);
+                        continue;
+                    }
+
+                    // 移動を実行
+                    await targetMember.voice.setChannel(targetVcId);
+                    successCount++;
+                } catch (error) {
+                    console.error(`ID ${userId} の移動エラー:`, error);
+                    errorMessages.push(`❌ ID ${userId} の処理中にエラーが発生しました。`);
+                }
+            }
+
+            // 最終的な結果メッセージを作成
+            let replyText = `✅ 合計 **${successCount} 人** を VC ${roomIndex + 1} に移動させました！\n`;
+            if (errorMessages.length > 0) {
+                replyText += `\n${errorMessages.join('\n')}`; // エラーがあった場合は追記
+            }
+
+            await interaction.editReply(replyText);
+        }
         // ▼ 既存コマンド：中身は使わずに、無効化メッセージを返す
         else if (commandName === 'omikuji' || commandName === 'challenge') {
             // ephemeral: true にすると、実行した本人にしか見えないメッセージになります
