@@ -2,47 +2,39 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 
-// 既存の機能の読み込み（中身は残しておく）
-const { createOmikujiResponse } = require('./omikuji.js');
-const { createChallengeResponse } = require('./challenge.js');
-
-// ★ボットの初期化（VC検知とメンバー取得の権限を追加！）
+// ボットの初期化
 const client = new Client({ 
     intents: [ 
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates, // VCへの入退室を検知するため
-        GatewayIntentBits.GuildMembers      // ロールを一括剥奪する際にメンバー一覧を取得するため
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMembers      
     ] 
 });
 
-// Render用Webサーバー
+// Render常時稼働用のWebサーバー
 const app = express();
 app.get('/', (req, res) => res.send('Bot is running! 🤖'));
 app.listen(process.env.PORT || 10000, () => console.log('Webサーバー起動中'));
 
 client.once('clientReady', (c) => {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`✅ ボット稼働開始！: ${c.user.tag}`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });
 
 // ==========================================
-// ★ 設定エリア：DiscordでコピーしたIDをここに貼る
+// ★ 設定エリア
 // ==========================================
 const TARGET_VC_IDS = [
-    '1548448589724778607', //VC1
-    '1548448655906705439', //VC2
-    '1548448681064276129'  //VC3
+    '1つ目のVCのIDをここに貼る', 
+    '2つ目のVCのIDをここに貼る', 
+    '3つ目のVCのIDをここに貼る'
 ];
-const TARGET_ROLE_ID = '1548447608433803416'; //ロール
+const TARGET_ROLE_ID = '付与するロールのIDをここに貼る';
 
 // ==========================================
-// ★ 新機能 1: VCに入ったユーザーにロールを付与
+// VC入室時のロール自動付与
 // ==========================================
 client.on('voiceStateUpdate', async (oldState, newState) => {
-    // ユーザーが入った先のVCが、指定した3つのどれかだった場合
     if (newState.channelId && TARGET_VC_IDS.includes(newState.channelId)) {
-        // マイクのミュート切り替え等ではなく、純粋に「チャンネルを移動/入室」してきた場合のみ処理
         if (oldState.channelId !== newState.channelId) {
             const member = newState.member;
             if (member) {
@@ -50,7 +42,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                     await member.roles.add(TARGET_ROLE_ID);
                     console.log(`🟢 ${member.user.tag} にロールを付与しました。`);
                 } catch (error) {
-                    console.error('ロール付与エラー (権限不足の可能性があります):', error);
+                    console.error('ロール付与エラー:', error);
                 }
             }
         }
@@ -58,7 +50,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 });
 
 // ==========================================
-// ★ 新機能 2 & 既存コマンドの無効化
+// スラッシュコマンドの処理
 // ==========================================
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
@@ -66,60 +58,38 @@ client.on('interactionCreate', async interaction => {
     const commandName = interaction.commandName;
 
     try {
-        // ▼ 新しいコマンド：全員からロールを剥奪する
-if (commandName === 'resetvc') {
-            // ▼カッコの中に { ephemeral: true } を入れる
-            await interaction.deferReply({ ephemeral: true }); // 考え中...
+        // ▼ 全員のロールを一括剥奪
+        if (commandName === 'resetvc') {
+            await interaction.deferReply({ ephemeral: true });
+            
+            const role = await interaction.guild.roles.fetch(TARGET_ROLE_ID);
+            if (!role) return interaction.editReply('❌ 指定されたロールが見つかりません。');
 
-            const guild = interaction.guild;
-            const role = await guild.roles.fetch(TARGET_ROLE_ID);
-
-            if (!role) {
-                return interaction.editReply('指定されたロールが見つかりませんでした。コード内のIDを確認してください。');
-            }
-
-            // このロールを持っている全メンバーを取得
-            const membersWithRole = role.members;
             let removedCount = 0;
-
-            // 一人ずつロールを外す
-            for (const [memberId, member] of membersWithRole) {
+            for (const [memberId, member] of role.members) {
                 await member.roles.remove(TARGET_ROLE_ID);
                 removedCount++;
             }
-
-            await interaction.editReply(`✅ 処理完了！ ${removedCount} 人のユーザーからロールを外しました。`);
+            await interaction.editReply(`✅ ${removedCount} 人のユーザーからロールを外しました。`);
         } 
-        // ▼ 新機能: ユーザーをVCへ強制移動させるコマンド
+        
+        // ▼ 単体ユーザーを強制移動
         else if (commandName === 'move') {
-            await interaction.deferReply({ ephemeral: true }); // 運営の操作なので隠す
+            await interaction.deferReply({ ephemeral: true });
 
             const targetUser = interaction.options.getUser('target');
             const roomIndex = parseInt(interaction.options.getString('room')); 
             
-            try {
-                // 対象のメンバー情報を取得
-                const targetMember = await interaction.guild.members.fetch(targetUser.id);
-                
-                // 対象者がどこかのVCに入っているかチェック
-                if (!targetMember.voice.channel) {
-                    return interaction.editReply(`❌ ${targetUser.username} さんは現在どのVCにも参加していないため、移動できません。（※事前にどこかのVCに入ってもらう必要があります）`);
-                }
-
-                // 設定エリアで定義した配列から、選ばれたVCのIDを取得
-                const targetVcId = TARGET_VC_IDS[roomIndex];
-                
-                // 強制移動を実行！
-                await targetMember.voice.setChannel(targetVcId);
-                
-                await interaction.editReply(`✅ ${targetUser.username} さんを VC ${roomIndex + 1} に強制移動させました！`);
-                
-            } catch (error) {
-                console.error('移動エラー:', error);
-                await interaction.editReply('❌ 移動に失敗しました。ボットのロールに「メンバーを移動（Move Members）」の権限があるか確認してください。');
+            const targetMember = await interaction.guild.members.fetch(targetUser.id);
+            if (!targetMember.voice.channel) {
+                return interaction.editReply(`❌ ${targetUser.username} さんは現在VCに参加していません。`);
             }
+
+            await targetMember.voice.setChannel(TARGET_VC_IDS[roomIndex]);
+            await interaction.editReply(`✅ ${targetUser.username} さんを VC ${roomIndex + 1} に移動させました。`);
         }
-        // ▼ 新機能: 複数人をまとめてVCへ強制移動させるコマンド
+
+        // ▼ 複数ユーザー（メンション指定）を強制移動
         else if (commandName === 'move_multi') {
             await interaction.deferReply({ ephemeral: true });
 
@@ -127,61 +97,70 @@ if (commandName === 'resetvc') {
             const roomIndex = parseInt(interaction.options.getString('room'));
             const targetVcId = TARGET_VC_IDS[roomIndex];
 
-            // メンション文字列（<@1234...>）からIDだけを抽出する仕組み
+            // メンションからIDを抽出（最適化済）
             const mentionRegex = /<@!?(\d+)>/g;
-            const userIds = [];
-            let match;
-            while ((match = mentionRegex.exec(targetsString)) !== null) {
-                userIds.push(match[1]); // IDの数字だけを配列に格納
-            }
+            const userIds = Array.from(targetsString.matchAll(mentionRegex), match => match[1]);
 
-            // メンションが1つも認識できなかった場合
             if (userIds.length === 0) {
-                return interaction.editReply('❌ メンションが正しく指定されていません。テキスト欄で `@ユーザー名` のように青く光る形式で入力してください。');
+                return interaction.editReply('❌ メンションが正しく指定されていません。');
             }
 
             let successCount = 0;
             let errorMessages = [];
 
-            // 抽出したIDを順番に処理していく
             for (const userId of userIds) {
                 try {
                     const targetMember = await interaction.guild.members.fetch(userId);
-                    
-                    // VCにいない人はスキップ
                     if (!targetMember.voice.channel) {
-                        errorMessages.push(`⚠️ ${targetMember.user.username} さんはVCにいないためスキップしました。`);
+                        errorMessages.push(`⚠️ ${targetMember.user.username} さんはVC未参加のためスキップしました。`);
                         continue;
                     }
-
-                    // 移動を実行
                     await targetMember.voice.setChannel(targetVcId);
                     successCount++;
                 } catch (error) {
-                    console.error(`ID ${userId} の移動エラー:`, error);
-                    errorMessages.push(`❌ ID ${userId} の処理中にエラーが発生しました。`);
+                    errorMessages.push(`❌ ID ${userId} の移動に失敗しました。`);
                 }
             }
 
-            // 最終的な結果メッセージを作成
-            let replyText = `✅ 合計 **${successCount} 人** を VC ${roomIndex + 1} に移動させました！\n`;
-            if (errorMessages.length > 0) {
-                replyText += `\n${errorMessages.join('\n')}`; // エラーがあった場合は追記
-            }
-
+            let replyText = `✅ **${successCount} 人** を VC ${roomIndex + 1} に移動させました！`;
+            if (errorMessages.length > 0) replyText += `\n${errorMessages.join('\n')}`;
             await interaction.editReply(replyText);
         }
-        // ▼ 既存コマンド：中身は使わずに、無効化メッセージを返す
-        else if (commandName === 'omikuji' || commandName === 'challenge') {
-            // ephemeral: true にすると、実行した本人にしか見えないメッセージになります
-            await interaction.reply({ content: '現在、このコマンドはメンテナンス中（無効化）です。', ephemeral: true });
+
+        // ▼ 特定ロールのユーザーを強制移動
+        else if (commandName === 'move_role') {
+            await interaction.deferReply({ ephemeral: true });
+
+            const targetRole = interaction.options.getRole('target_role');
+            const roomIndex = parseInt(interaction.options.getString('room'));
+            
+            await interaction.guild.members.fetch();
+            const membersWithRole = targetRole.members;
+
+            if (membersWithRole.size === 0) {
+                return interaction.editReply(`❌ 「${targetRole.name}」ロールを持つメンバーがサーバー内にいません。`);
+            }
+
+            let successCount = 0;
+            let skipCount = 0;
+
+            for (const [memberId, member] of membersWithRole) {
+                if (!member.voice.channel) {
+                    skipCount++;
+                    continue;
+                }
+                await member.voice.setChannel(TARGET_VC_IDS[roomIndex]);
+                successCount++;
+            }
+
+            let replyText = `✅ 「${targetRole.name}」ロールを持つ **${successCount} 人** を VC ${roomIndex + 1} に移動させました！`;
+            if (skipCount > 0) replyText += `\n*(⚠️ VC未参加のため ${skipCount} 人はスキップしました)*`;
+            await interaction.editReply(replyText);
         }
 
     } catch (error) {
-        console.error('インタラクションエラー:', error);
-        if (interaction.deferred) {
-            await interaction.editReply('エラーが発生しました。');
-        }
+        console.error('コマンド実行エラー:', error);
+        await interaction.editReply('❌ 処理中にエラーが発生しました。');
     }
 });
 
