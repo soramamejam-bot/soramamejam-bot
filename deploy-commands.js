@@ -39,6 +39,24 @@ const commands = [
                     { name: 'VC 1', value: '0' },
                     { name: 'VC 2', value: '1' },
                     { name: 'VC 3', value: '2' }
+                )),
+                // move_multi の終わりのカッコの後にカンマ(,)を付けて追加します
+    // ▼▼ ここから追加 ▼▼
+    new SlashCommandBuilder()
+        .setName('move_role')
+        .setDescription('指定したロールを持つユーザーをVCに一斉移動させます')
+        .addRoleOption(option => 
+            option.setName('target_role')
+                .setDescription('移動させる対象のロールを選択')
+                .setRequired(true))
+        .addStringOption(option => 
+            option.setName('room')
+                .setDescription('移動先のVCを選択')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'VC 1', value: '0' },
+                    { name: 'VC 2', value: '1' },
+                    { name: 'VC 3', value: '2' }
                 ))
     // ▲▲ ここまで追加 ▲▲
 ].map(command => command.toJSON());
