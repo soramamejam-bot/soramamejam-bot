@@ -10,8 +10,8 @@ const choices = [
 
 const commands = [
     new SlashCommandBuilder()
-        .setName('resetvc')
-        .setDescription('全員のVC参加者ロールをまとめて外します'),
+        .setName('reset_role')
+        .setDescription('全員の回答済みロールをまとめて外します'),
     
     new SlashCommandBuilder()
         .setName('move')
@@ -39,13 +39,10 @@ const commands = [
                 .setRequired(true)
                 .addChoices(...choices)),
 
+// ▼ move_role から addRoleOption を削除（固定ロールを使用するため）
     new SlashCommandBuilder()
         .setName('move_role')
-        .setDescription('指定したロールを持つユーザーをVCに一斉移動させます')
-        .addRoleOption(option => 
-            option.setName('target_role')
-                .setDescription('移動させる対象のロールを選択')
-                .setRequired(true))
+        .setDescription('設定されたロールを持つユーザーをVCに一斉移動させます')
         .addStringOption(option => 
             option.setName('room')
                 .setDescription('移動先のVCを選択')

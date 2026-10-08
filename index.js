@@ -1,5 +1,12 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');
+const { 
+    Client, 
+    GatewayIntentBits, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    ComponentType 
+} = require('discord.js');
 const express = require('express');
 
 const client = new Client({ 
@@ -21,23 +28,20 @@ client.once('clientReady', (c) => {
 // ==========================================
 // ★ 設定エリア
 // ==========================================
-// 順番を [部屋A, 部屋B, 部屋C, 一般] の順で記載してください
 const TARGET_VC_IDS = [
-    '1548448589724778607', 
-    '1548448655906705439', 
-    '1548448681064276129',
-    '999296512846733385' 
+    '部屋AのVC_IDをここに貼る', 
+    '部屋BのVC_IDをここに貼る', 
+    '部屋CのVC_IDをここに貼る',
+    '一般のVC_IDをここに貼る' 
 ];
-const TARGET_ROLE_ID = '1548447608433803416';
+const TARGET_ROLE_ID = '付与するロールのIDをここに貼る';
 
-// メッセージ表示用の部屋名リスト
 const ROOM_NAMES = ['部屋A', '部屋B', '部屋C', '一般'];
 
 // ==========================================
 // VC入室時のロール自動付与（部屋A・B・Cのみ対象）
 // ==========================================
 client.on('voiceStateUpdate', async (oldState, newState) => {
-    // 最初の3つのVC（部屋A, 部屋B, 部屋C）のみを自動付与の対象にする
     const roleTargetVcIds = TARGET_VC_IDS.slice(0, 3);
 
     if (newState.channelId && roleTargetVcIds.includes(newState.channelId)) {
@@ -65,7 +69,7 @@ client.on('interactionCreate', async interaction => {
 
     try {
         // ▼ 全員のロールを一括剥奪
-        if (commandName === 'resetvc') {
+        if (commandName === 'reset_role') {
             await interaction.deferReply({ ephemeral: true });
             
             const role = await interaction.guild.roles.fetch(TARGET_ROLE_ID);
@@ -132,40 +136,86 @@ client.on('interactionCreate', async interaction => {
             await interaction.editReply(replyText);
         }
 
-        // ▼ 特定ロールのユーザーを強制移動
+        // ▼ 固定ロールのユーザーを強制移動（確認ボタン付き）
         else if (commandName === 'move_role') {
             await interaction.deferReply({ ephemeral: true });
 
-            const targetRole = interaction.options.getRole('target_role');
             const roomIndex = parseInt(interaction.options.getString('room'));
-            
-            await interaction.guild.members.fetch();
-            const membersWithRole = targetRole.members;
+            const targetVcId = TARGET_VC_IDS[roomIndex];
 
-            if (membersWithRole.size === 0) {
-                return interaction.editReply(`❌ 「${targetRole.name}」ロールを持つメンバーがサーバー内にいません。`);
+            const targetRole = await interaction.guild.roles.fetch(TARGET_ROLE_ID);
+            if (!targetRole) {
+                return interaction.editReply('❌ 対象のロールが見つかりません。設定エリアのIDを確認してください。');
             }
 
-            let successCount = 0;
-            let skipCount = 0;
+            // --- 確認用ボタンの作成 ---
+            const confirmButton = new ButtonBuilder()
+                .setCustomId('confirm_move')
+                .setLabel('はい（移動させる）')
+                .setStyle(ButtonStyle.Danger); // 赤色のボタン
 
-            for (const [memberId, member] of membersWithRole) {
-                if (!member.voice.channel) {
-                    skipCount++;
-                    continue;
+            const cancelButton = new ButtonBuilder()
+                .setCustomId('cancel_move')
+                .setLabel('キャンセル')
+                .setStyle(ButtonStyle.Secondary); // 灰色のボタン
+
+            const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+            // 確認メッセージの送信（自分だけに表示）
+            const response = await interaction.editReply({
+                content: `⚠️ **確認**: 「${targetRole.name}」ロールを持っているメンバーを **${ROOM_NAMES[roomIndex]}** へ一斉移動させますか？`,
+                components: [row]
+            });
+
+            // ボタンが押されるのを待つ（制限時間: 15秒）
+            try {
+                const confirmation = await response.awaitMessageComponent({
+                    filter: i => i.user.id === interaction.user.id, // コマンドを打った本人だけが押せる
+                    time: 15000 
+                });
+
+                if (confirmation.customId === 'confirm_move') {
+                    // 「はい」が押された場合：ボタンを無効化して実行中表示に
+                    await confirmation.update({ content: '🔄 移動処理を実行中...', components: [] });
+
+                    await interaction.guild.members.fetch();
+                    const membersWithRole = targetRole.members;
+
+                    if (membersWithRole.size === 0) {
+                        return interaction.editReply(`❌ 「${targetRole.name}」ロールを持つメンバーがサーバー内にいません。`);
+                    }
+
+                    let successCount = 0;
+                    let skipCount = 0;
+
+                    for (const [memberId, member] of membersWithRole) {
+                        if (!member.voice.channel) {
+                            skipCount++;
+                            continue;
+                        }
+                        await member.voice.setChannel(targetVcId);
+                        successCount++;
+                    }
+
+                    let replyText = `✅ 「${targetRole.name}」ロールを持つ **${successCount} 人** を **${ROOM_NAMES[roomIndex]}** に移動させました！`;
+                    if (skipCount > 0) replyText += `\n*(⚠️ VC未参加のため ${skipCount} 人はスキップしました)*`;
+
+                    await interaction.editReply({ content: replyText, components: [] });
+
+                } else if (confirmation.customId === 'cancel_move') {
+                    // 「キャンセル」が押された場合
+                    await confirmation.update({ content: '🚫 移動処理をキャンセルしました。', components: [] });
                 }
-                await member.voice.setChannel(TARGET_VC_IDS[roomIndex]);
-                successCount++;
-            }
 
-            let replyText = `✅ 「${targetRole.name}」ロールを持つ **${successCount} 人** を **${ROOM_NAMES[roomIndex]}** に移動させました！`;
-            if (skipCount > 0) replyText += `\n*(⚠️ VC未参加のため ${skipCount} 人はスキップしました)*`;
-            await interaction.editReply(replyText);
+            } catch (error) {
+                // 15秒間どちらも押されなかった場合
+                await interaction.editReply({ content: '⏱️ 時間切れのため、移動処理をキャンセルしました。', components: [] });
+            }
         }
 
     } catch (error) {
         console.error('コマンド実行エラー:', error);
-        await interaction.editReply('❌ 処理中にエラーが発生しました。');
+        await interaction.editReply({ content: '❌ 処理中にエラーが発生しました。', components: [] });
     }
 });
 
