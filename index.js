@@ -2,7 +2,6 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 
-// ボットの初期化
 const client = new Client({ 
     intents: [ 
         GatewayIntentBits.Guilds,
@@ -11,7 +10,6 @@ const client = new Client({
     ] 
 });
 
-// Render常時稼働用のWebサーバー
 const app = express();
 app.get('/', (req, res) => res.send('Bot is running! 🤖'));
 app.listen(process.env.PORT || 10000, () => console.log('Webサーバー起動中'));
@@ -23,18 +21,26 @@ client.once('clientReady', (c) => {
 // ==========================================
 // ★ 設定エリア
 // ==========================================
+// 順番を [部屋A, 部屋B, 部屋C, 一般] の順で記載してください
 const TARGET_VC_IDS = [
     '1548448589724778607', 
     '1548448655906705439', 
-    '1548448681064276129'
+    '1548448681064276129',
+    '999296512846733385' 
 ];
 const TARGET_ROLE_ID = '1548447608433803416';
 
+// メッセージ表示用の部屋名リスト
+const ROOM_NAMES = ['部屋A', '部屋B', '部屋C', '一般'];
+
 // ==========================================
-// VC入室時のロール自動付与
+// VC入室時のロール自動付与（部屋A・B・Cのみ対象）
 // ==========================================
 client.on('voiceStateUpdate', async (oldState, newState) => {
-    if (newState.channelId && TARGET_VC_IDS.includes(newState.channelId)) {
+    // 最初の3つのVC（部屋A, 部屋B, 部屋C）のみを自動付与の対象にする
+    const roleTargetVcIds = TARGET_VC_IDS.slice(0, 3);
+
+    if (newState.channelId && roleTargetVcIds.includes(newState.channelId)) {
         if (oldState.channelId !== newState.channelId) {
             const member = newState.member;
             if (member) {
@@ -86,7 +92,7 @@ client.on('interactionCreate', async interaction => {
             }
 
             await targetMember.voice.setChannel(TARGET_VC_IDS[roomIndex]);
-            await interaction.editReply(`✅ ${targetUser.username} さんを VC ${roomIndex + 1} に移動させました。`);
+            await interaction.editReply(`✅ ${targetUser.username} さんを **${ROOM_NAMES[roomIndex]}** に移動させました。`);
         }
 
         // ▼ 複数ユーザー（メンション指定）を強制移動
@@ -97,7 +103,6 @@ client.on('interactionCreate', async interaction => {
             const roomIndex = parseInt(interaction.options.getString('room'));
             const targetVcId = TARGET_VC_IDS[roomIndex];
 
-            // メンションからIDを抽出（最適化済）
             const mentionRegex = /<@!?(\d+)>/g;
             const userIds = Array.from(targetsString.matchAll(mentionRegex), match => match[1]);
 
@@ -122,7 +127,7 @@ client.on('interactionCreate', async interaction => {
                 }
             }
 
-            let replyText = `✅ **${successCount} 人** を VC ${roomIndex + 1} に移動させました！`;
+            let replyText = `✅ **${successCount} 人** を **${ROOM_NAMES[roomIndex]}** に移動させました！`;
             if (errorMessages.length > 0) replyText += `\n${errorMessages.join('\n')}`;
             await interaction.editReply(replyText);
         }
@@ -153,7 +158,7 @@ client.on('interactionCreate', async interaction => {
                 successCount++;
             }
 
-            let replyText = `✅ 「${targetRole.name}」ロールを持つ **${successCount} 人** を VC ${roomIndex + 1} に移動させました！`;
+            let replyText = `✅ 「${targetRole.name}」ロールを持つ **${successCount} 人** を **${ROOM_NAMES[roomIndex]}** に移動させました！`;
             if (skipCount > 0) replyText += `\n*(⚠️ VC未参加のため ${skipCount} 人はスキップしました)*`;
             await interaction.editReply(replyText);
         }
