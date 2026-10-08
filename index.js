@@ -69,20 +69,63 @@ client.on('interactionCreate', async interaction => {
 
     try {
         // ▼ 全員のロールを一括剥奪
-        if (commandName === 'reset_role') {
+// ▼ 固定ロールの一括剥奪（確認ボタン付き）
+        else if (commandName === 'reset_role') {
             await interaction.deferReply({ ephemeral: true });
-            
-            const role = await interaction.guild.roles.fetch(TARGET_ROLE_ID);
-            if (!role) return interaction.editReply('❌ 指定されたロールが見つかりません。');
 
-            let removedCount = 0;
-            for (const [memberId, member] of role.members) {
-                await member.roles.remove(TARGET_ROLE_ID);
-                removedCount++;
+            const role = await interaction.guild.roles.fetch(TARGET_ROLE_ID);
+            if (!role) {
+                return interaction.editReply('❌ 指定されたロールが見つかりません。設定エリアのIDを確認してください。');
             }
-            await interaction.editReply(`✅ ${removedCount} 人のユーザーからロールを外しました。`);
-        } 
-        
+
+            // --- 確認用ボタンの作成 ---
+            const confirmButton = new ButtonBuilder()
+                .setCustomId('confirm_reset')
+                .setLabel('はい（全員外す）')
+                .setStyle(ButtonStyle.Danger); // 赤色ボタン
+
+            const cancelButton = new ButtonBuilder()
+                .setCustomId('cancel_reset')
+                .setLabel('キャンセル')
+                .setStyle(ButtonStyle.Secondary); // 灰色ボタン
+
+            const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+            // 確認メッセージを表示（自分だけに見えます）
+            const response = await interaction.editReply({
+                content: `⚠️ **確認**: 全員から「${role.name}」ロールを一括で外しますか？`,
+                components: [row]
+            });
+
+            // ボタンが押されるのを待つ（制限時間: 15秒）
+            try {
+                const confirmation = await response.awaitMessageComponent({
+                    filter: i => i.user.id === interaction.user.id,
+                    time: 15000 
+                });
+
+                if (confirmation.customId === 'confirm_reset') {
+                    await confirmation.update({ content: '🔄 ロール外しの処理を実行中...', components: [] });
+
+                    let removedCount = 0;
+                    for (const [memberId, member] of role.members) {
+                        await member.roles.remove(TARGET_ROLE_ID);
+                        removedCount++;
+                    }
+
+                    await interaction.editReply({ 
+                        content: `✅ **${removedCount} 人**のユーザーから「${role.name}」ロールを外しました！`, 
+                        components: [] 
+                    });
+
+                } else if (confirmation.customId === 'cancel_reset') {
+                    await confirmation.update({ content: '🚫 リセット処理をキャンセルしました。', components: [] });
+                }
+
+            } catch (error) {
+                await interaction.editReply({ content: '⏱️ 時間切れのため、リセット処理をキャンセルしました。', components: [] });
+            }
+        }        
         // ▼ 単体ユーザーを強制移動
         else if (commandName === 'move') {
             await interaction.deferReply({ ephemeral: true });
