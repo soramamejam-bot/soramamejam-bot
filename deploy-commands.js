@@ -19,9 +19,9 @@ const commands = [
                 .setDescription('移動先のVCを選択')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'VC 1', value: '0' },
-                    { name: 'VC 2', value: '1' },
-                    { name: 'VC 3', value: '2' }
+                    { name: '部屋A', value: '0' },
+                    { name: '部屋B', value: '1' },
+                    { name: '部屋C', value: '2' }
                 )),
                 // ▼▼ ここから追加 ▼▼
     new SlashCommandBuilder()
@@ -36,9 +36,9 @@ const commands = [
                 .setDescription('移動先のVCを選択')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'VC 1', value: '0' },
-                    { name: 'VC 2', value: '1' },
-                    { name: 'VC 3', value: '2' }
+                    { name: '部屋A', value: '0' },
+                    { name: '部屋B', value: '1' },
+                    { name: '部屋C', value: '2' }
                 )),
                 // move_multi の終わりのカッコの後にカンマ(,)を付けて追加します
     // ▼▼ ここから追加 ▼▼
@@ -54,9 +54,9 @@ const commands = [
                 .setDescription('移動先のVCを選択')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'VC 1', value: '0' },
-                    { name: 'VC 2', value: '1' },
-                    { name: 'VC 3', value: '2' }
+                    { name: '部屋A', value: '0' },
+                    { name: '部屋B', value: '1' },
+                    { name: '部屋C', value: '2' }
                 ))
     // ▲▲ ここまで追加 ▲▲
 ].map(command => command.toJSON());
@@ -69,7 +69,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN?.tri
 
         // ボットのクライアントID（Application ID）を指定します
         // .env に CLIENT_ID を設定していない場合は、下の '' の中に直接IDを貼り付けてください
-        const clientId = process.env.CLIENT_ID || 'ここにボットのCLIENT_IDを貼り付ける'; 
+        const clientId = process.env.CLIENT_ID ; 
 
         // グローバルコマンドとして上書き登録
         await rest.put(
