@@ -50,8 +50,29 @@ const TEXT_COMMAND_ROOM_NAMES = ['一般', '部屋A', '部屋B', '部屋C'];
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild || !/^!move(?:\s|$)/i.test(message.content)) return;
 
+    try {
+        await message.delete();
+    } catch (error) {
+        console.warn('!moveコマンドメッセージ削除エラー:', error);
+    }
+
+    const sendTemporaryReply = async content => {
+        try {
+            const replyMessage = await message.channel.send(content);
+            setTimeout(() => {
+                replyMessage.delete().catch(error => {
+                    if (error.code !== 10008) {
+                        console.warn('!move結果メッセージ削除エラー:', error);
+                    }
+                });
+            }, 4000);
+        } catch (error) {
+            console.error('!move結果メッセージ送信エラー:', error);
+        }
+    };
+
     if (!message.member.permissions.has(PermissionFlagsBits.MoveMembers)) {
-        await message.reply('❌ このコマンドには「メンバーを移動」権限が必要です。');
+        await sendTemporaryReply('❌ このコマンドには「メンバーを移動」権限が必要です。');
         return;
     }
 
@@ -59,14 +80,14 @@ client.on('messageCreate', async message => {
     const roomName = TEXT_COMMAND_ROOM_NAMES[Number(roomNumber)];
     const configuredRoomIndex = ROOM_NAMES.indexOf(roomName);
     if (!/^\d+$/.test(roomNumber ?? '') || configuredRoomIndex < 0) {
-        await message.reply('❌ 部屋番号は 0（一般）、1（部屋A）、2（部屋B）、3（部屋C）で指定してください。');
+        await sendTemporaryReply('❌ 部屋番号は 0（一般）、1（部屋A）、2（部屋B）、3（部屋C）で指定してください。');
         return;
     }
 
     const targetVcId = TARGET_VC_IDS[configuredRoomIndex];
     const targetChannel = await message.guild.channels.fetch(targetVcId).catch(() => null);
     if (!targetChannel?.isVoiceBased()) {
-        await message.reply(`❌ 移動先の「${roomName}」ボイスチャンネルが見つかりません。`);
+        await sendTemporaryReply(`❌ 移動先の「${roomName}」ボイスチャンネルが見つかりません。`);
         return;
     }
 
@@ -74,7 +95,7 @@ client.on('messageCreate', async message => {
         [...message.content.matchAll(/<@!?(\d+)>/g)].map(match => match[1])
     )];
     if (userIds.length === 0) {
-        await message.reply('❌ 移動するメンバーをメンションしてください。例: `!move 1 @ユーザー`');
+        await sendTemporaryReply('❌ 移動するメンバーをメンションしてください。例: `!move 1 @ユーザー`');
         return;
     }
 
@@ -82,7 +103,7 @@ client.on('messageCreate', async message => {
     const botCanMoveToTarget = botMember?.permissions.has(PermissionFlagsBits.MoveMembers)
         && targetChannel.permissionsFor(botMember)?.has(PermissionFlagsBits.MoveMembers);
     if (!botCanMoveToTarget) {
-        await message.reply('❌ ボットに「メンバーを移動」権限がありません。サーバーと移動先VCの権限を確認してください。');
+        await sendTemporaryReply('❌ ボットに「メンバーを移動」権限がありません。サーバーと移動先VCの権限を確認してください。');
         return;
     }
 
@@ -112,7 +133,7 @@ client.on('messageCreate', async message => {
     const skippedSummary = skipped.length > 0
         ? `\nスキップ ${skipped.length} 人: ${skipped.slice(0, 15).join('、')}${skipped.length > 15 ? '、ほか' : ''}`
         : '';
-    await message.reply(`✅ **${successCount} 人**を **${roomName}** に移動しました。${skippedSummary}`);
+    await sendTemporaryReply(`✅ **${successCount} 人**を **${roomName}** に移動しました。${skippedSummary}`);
 });
 
 // ==========================================
