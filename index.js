@@ -13,7 +13,9 @@ const client = new Client({
     intents: [ 
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMembers      
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
     ] 
 });
 
@@ -29,14 +31,88 @@ client.once('clientReady', (c) => {
 // ★ 設定エリア
 // ==========================================
 const TARGET_VC_IDS = [
-    '1548448589724778607', 
-    '1548448655906705439', 
-    '1548448681064276129',
-    '999296512846733385' 
+    '1558080487724027928',
+    '1558080778997600396', 
+    '1558080717303586926', 
+    '1558080848903934042'
 ];
-const TARGET_ROLE_ID = '1548447608433803416';
+const TARGET_ROLE_ID = '1558085141090275358';
 
-const ROOM_NAMES = ['部屋A', '部屋B', '部屋C', '一般'];
+const ROOM_NAMES = ['一般', '部屋A', '部屋B', '部屋C'];
+
+// テキストコマンドの番号は、現在の設定配列の順序ではなく部屋名で解決する。
+const TEXT_COMMAND_ROOM_NAMES = ['一般', '部屋A', '部屋B', '部屋C'];
+
+// ==========================================
+// テキストコマンド（!move）
+// ==========================================
+client.on('messageCreate', async message => {
+    if (message.author.bot || !message.guild || !/^!move(?:\s|$)/i.test(message.content)) return;
+
+    if (!message.member.permissions.has(PermissionFlagsBits.MoveMembers)) {
+        await message.reply('❌ このコマンドには「メンバーを移動」権限が必要です。');
+        return;
+    }
+
+    const [, roomNumber, ...args] = message.content.trim().split(/\s+/);
+    const roomName = TEXT_COMMAND_ROOM_NAMES[Number(roomNumber)];
+    const configuredRoomIndex = ROOM_NAMES.indexOf(roomName);
+    if (!/^\d+$/.test(roomNumber ?? '') || configuredRoomIndex < 0) {
+        await message.reply('❌ 部屋番号は 0（一般）、1（部屋A）、2（部屋B）、3（部屋C）で指定してください。');
+        return;
+    }
+
+    const targetVcId = TARGET_VC_IDS[configuredRoomIndex];
+    const targetChannel = await message.guild.channels.fetch(targetVcId).catch(() => null);
+    if (!targetChannel?.isVoiceBased()) {
+        await message.reply(`❌ 移動先の「${roomName}」ボイスチャンネルが見つかりません。`);
+        return;
+    }
+
+    const userIds = [...new Set(
+        [...message.content.matchAll(/<@!?(\d+)>/g)].map(match => match[1])
+    )];
+    if (userIds.length === 0) {
+        await message.reply('❌ 移動するメンバーをメンションしてください。例: `!move 1 @ユーザー`');
+        return;
+    }
+
+    const botMember = message.guild.members.me;
+    const botCanMoveToTarget = botMember?.permissions.has(PermissionFlagsBits.MoveMembers)
+        && targetChannel.permissionsFor(botMember)?.has(PermissionFlagsBits.MoveMembers);
+    if (!botCanMoveToTarget) {
+        await message.reply('❌ ボットに「メンバーを移動」権限がありません。サーバーと移動先VCの権限を確認してください。');
+        return;
+    }
+
+    let successCount = 0;
+    const skipped = [];
+    for (const userId of userIds) {
+        try {
+            const member = await message.guild.members.fetch(userId);
+            const sourceChannel = member.voice.channel;
+            if (!sourceChannel) {
+                skipped.push(`${member.user.username}（VC未参加）`);
+                continue;
+            }
+            if (!sourceChannel.permissionsFor(botMember)?.has(PermissionFlagsBits.MoveMembers)) {
+                skipped.push(`${member.user.username}（移動権限なし）`);
+                continue;
+            }
+
+            await member.voice.setChannel(targetChannel);
+            successCount++;
+        } catch (error) {
+            console.error(`テキストmove失敗 (ID: ${userId}):`, error);
+            skipped.push(`ID ${userId}（移動失敗）`);
+        }
+    }
+
+    const skippedSummary = skipped.length > 0
+        ? `\nスキップ ${skipped.length} 人: ${skipped.slice(0, 15).join('、')}${skipped.length > 15 ? '、ほか' : ''}`
+        : '';
+    await message.reply(`✅ **${successCount} 人**を **${roomName}** に移動しました。${skippedSummary}`);
+});
 
 // ==========================================
 // VC入室時のロール自動付与（部屋A・B・Cのみ対象）
@@ -70,7 +146,7 @@ client.on('interactionCreate', async interaction => {
     try {
         // ▼ 全員のロールを一括剥奪
 // ▼ 固定ロールの一括剥奪（確認ボタン付き）
-        else if (commandName === 'reset_role') {
+        if (commandName === 'reset_role') {
             await interaction.deferReply({ ephemeral: true });
 
             const role = await interaction.guild.roles.fetch(TARGET_ROLE_ID);
