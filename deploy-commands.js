@@ -2,10 +2,10 @@ require('dotenv').config();
 const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const choices = [
-    { name: '部屋A', value: '0' },
-    { name: '部屋B', value: '1' },
-    { name: '部屋C', value: '2' },
-    { name: '一般', value: '3' }
+    { name: '一般', value: '0' },
+    { name: '部屋A', value: '1' },
+    { name: '部屋B', value: '2' },
+    { name: '部屋C', value: '3' }
 ];
 
 const commands = [

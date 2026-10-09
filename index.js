@@ -5,7 +5,8 @@ const {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle, 
-    ComponentType 
+    ComponentType,
+    PermissionFlagsBits
 } = require('discord.js');
 const express = require('express');
 
@@ -118,7 +119,7 @@ client.on('messageCreate', async message => {
 // VC入室時のロール自動付与（部屋A・B・Cのみ対象）
 // ==========================================
 client.on('voiceStateUpdate', async (oldState, newState) => {
-    const roleTargetVcIds = TARGET_VC_IDS.slice(0, 3);
+    const roleTargetVcIds = TARGET_VC_IDS.slice(1, 4);
 
     if (newState.channelId && roleTargetVcIds.includes(newState.channelId)) {
         if (oldState.channelId !== newState.channelId) {
