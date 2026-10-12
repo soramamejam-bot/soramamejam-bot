@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 const choices = [
     { name: '一般', value: '0' },
@@ -12,6 +12,26 @@ const commands = [
     new SlashCommandBuilder()
         .setName('reset_role')
         .setDescription('全員の回答済みロールをまとめて外します'),
+
+    new SlashCommandBuilder()
+        .setName('mute_all')
+        .setDescription('選択した部屋の参加者全員をサーバーミュートします')
+        .setDefaultMemberPermissions(PermissionFlagsBits.MuteMembers)
+        .addStringOption(option =>
+            option.setName('room')
+                .setDescription('対象の部屋を選択')
+                .setRequired(true)
+                .addChoices(...choices)),
+
+    new SlashCommandBuilder()
+        .setName('unmute_all')
+        .setDescription('選択した部屋の参加者全員のサーバーミュートを解除します')
+        .setDefaultMemberPermissions(PermissionFlagsBits.MuteMembers)
+        .addStringOption(option =>
+            option.setName('room')
+                .setDescription('対象の部屋を選択')
+                .setRequired(true)
+                .addChoices(...choices)),
     
     new SlashCommandBuilder()
         .setName('move')

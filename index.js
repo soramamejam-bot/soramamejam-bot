@@ -6,7 +6,8 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     ComponentType,
-    PermissionFlagsBits
+    PermissionFlagsBits,
+    DiscordjsErrorCodes
 } = require('discord.js');
 const express = require('express');
 
@@ -166,6 +167,114 @@ client.on('interactionCreate', async interaction => {
     const commandName = interaction.commandName;
 
     try {
+        // ▼ 選択した部屋の参加者を一括サーバーミュート／解除
+        if (commandName === 'mute_all' || commandName === 'unmute_all') {
+            await interaction.deferReply({ ephemeral: true });
+
+            if (!interaction.inGuild() || !interaction.guild) {
+                return interaction.editReply('❌ このコマンドはサーバー内でのみ使用できます。');
+            }
+
+            if (!TARGET_VC_IDS.includes(interaction.channelId)) {
+                return interaction.editReply('❌ このコマンドは「一般」「部屋A」「部屋B」「部屋C」内でのみ使用できます。');
+            }
+
+            if (!interaction.memberPermissions?.has(PermissionFlagsBits.MuteMembers)) {
+                return interaction.editReply('❌ このコマンドには「メンバーをミュート」権限が必要です。');
+            }
+
+            const roomIndex = Number(interaction.options.getString('room'));
+            if (!Number.isInteger(roomIndex) || !ROOM_NAMES[roomIndex] || !TARGET_VC_IDS[roomIndex]) {
+                return interaction.editReply('❌ 対象の部屋を選択してください。');
+            }
+
+            const roomName = ROOM_NAMES[roomIndex];
+            const targetVcId = TARGET_VC_IDS[roomIndex];
+            const targetChannel = await interaction.guild.channels.fetch(targetVcId);
+            if (!targetChannel?.isVoiceBased()) {
+                return interaction.editReply(`❌ 対象の「${roomName}」ボイスチャンネルが見つかりません。`);
+            }
+
+            const botMember = interaction.guild.members.me;
+            if (!botMember?.permissions.has(PermissionFlagsBits.MuteMembers)
+                || !targetChannel.permissionsFor(botMember)?.has(PermissionFlagsBits.MuteMembers)) {
+                return interaction.editReply('❌ ボットに「メンバーをミュート」権限がありません。サーバーと対象VCの権限を確認してください。');
+            }
+
+            const shouldMute = commandName === 'mute_all';
+            const actionLabel = shouldMute ? 'サーバーミュート' : 'サーバーミュート解除';
+            const confirmButton = new ButtonBuilder()
+                .setCustomId(`confirm_${commandName}`)
+                .setLabel('実行する')
+                .setStyle(ButtonStyle.Danger);
+            const cancelButton = new ButtonBuilder()
+                .setCustomId(`cancel_${commandName}`)
+                .setLabel('キャンセル')
+                .setStyle(ButtonStyle.Secondary);
+            const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+            const response = await interaction.editReply({
+                content: `⚠️ **確認**: 「${roomName}」の参加者全員（${targetChannel.members.size} 人）を${actionLabel}しますか？`,
+                components: [row]
+            });
+
+            const confirmation = await response.awaitMessageComponent({
+                filter: component => component.user.id === interaction.user.id,
+                time: 15000
+            }).catch(error => {
+                if (error.code === DiscordjsErrorCodes.InteractionCollectorError) return null;
+                throw error;
+            });
+
+            if (!confirmation) {
+                return interaction.editReply({
+                    content: '⏱️ 時間切れのため、処理をキャンセルしました。',
+                    components: []
+                });
+            }
+
+            if (confirmation.customId === `cancel_${commandName}`) {
+                return confirmation.update({
+                    content: '🚫 処理をキャンセルしました。',
+                    components: []
+                });
+            }
+
+            await confirmation.update({
+                content: `🔄 「${roomName}」の${actionLabel}を実行中...`,
+                components: []
+            });
+
+            let successCount = 0;
+            let unchangedCount = 0;
+            const failures = [];
+            for (const member of targetChannel.members.values()) {
+                if (member.voice.serverMute === shouldMute) {
+                    unchangedCount++;
+                    continue;
+                }
+
+                try {
+                    await member.voice.setMute(shouldMute, `一括${actionLabel} (${interaction.user.tag})`);
+                    successCount++;
+                } catch (error) {
+                    console.error(`${actionLabel}失敗 (ユーザーID: ${member.id}):`, error);
+                    failures.push(member.user.username);
+                }
+            }
+
+            const failureSummary = failures.length > 0
+                ? `\n❌ 失敗 ${failures.length} 人: ${failures.slice(0, 10).join('、')}${failures.length > 10 ? '、ほか' : ''}`
+                : '';
+            const unchangedSummary = unchangedCount > 0
+                ? `\n変更不要 ${unchangedCount} 人`
+                : '';
+            return interaction.editReply({
+                content: `✅ 「${roomName}」で${actionLabel}を行いました。成功 ${successCount} 人${unchangedSummary}${failureSummary}`,
+                components: []
+            });
+        }
+
         // ▼ 全員のロールを一括剥奪
 // ▼ 固定ロールの一括剥奪（確認ボタン付き）
         if (commandName === 'reset_role') {
