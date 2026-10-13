@@ -41,9 +41,26 @@ const TARGET_VC_IDS = [
 const TARGET_ROLE_ID = '1558085141090275358';
 
 const ROOM_NAMES = ['一般', '部屋A', '部屋B', '部屋C'];
+const ROLE_TARGET_VC_IDS = TARGET_VC_IDS.slice(1);
 
 // テキストコマンドの番号は、現在の設定配列の順序ではなく部屋名で解決する。
 const TEXT_COMMAND_ROOM_NAMES = ['一般', '部屋A', '部屋B', '部屋C'];
+
+async function grantRoleAfterCommandMove(member, sourceChannelId, targetChannelId) {
+    if (sourceChannelId === targetChannelId || !ROLE_TARGET_VC_IDS.includes(targetChannelId)) {
+        return 'not-needed';
+    }
+    if (member.roles.cache.has(TARGET_ROLE_ID)) return 'already-has-role';
+
+    try {
+        await member.roles.add(TARGET_ROLE_ID);
+        console.log(`🟢 ${member.user.tag} にロールを付与しました。`);
+        return 'added';
+    } catch (error) {
+        console.error(`コマンド移動後のロール付与エラー (ID: ${member.id}):`, error);
+        return 'failed';
+    }
+}
 
 // ==========================================
 // テキストコマンド（!move）
@@ -110,6 +127,7 @@ client.on('messageCreate', async message => {
 
     let successCount = 0;
     const skipped = [];
+    const roleGrantFailures = [];
     for (const userId of userIds) {
         try {
             const member = await message.guild.members.fetch(userId);
@@ -125,6 +143,8 @@ client.on('messageCreate', async message => {
 
             await member.voice.setChannel(targetChannel);
             successCount++;
+            const roleResult = await grantRoleAfterCommandMove(member, sourceChannel.id, targetChannel.id);
+            if (roleResult === 'failed') roleGrantFailures.push(member.user.username);
         } catch (error) {
             console.error(`テキストmove失敗 (ID: ${userId}):`, error);
             skipped.push(`ID ${userId}（移動失敗）`);
@@ -134,28 +154,10 @@ client.on('messageCreate', async message => {
     const skippedSummary = skipped.length > 0
         ? `\nスキップ ${skipped.length} 人: ${skipped.slice(0, 15).join('、')}${skipped.length > 15 ? '、ほか' : ''}`
         : '';
-    await sendTemporaryReply(`✅ **${successCount} 人**を **${roomName}** に移動しました。${skippedSummary}`);
-});
-
-// ==========================================
-// VC入室時のロール自動付与（部屋A・B・Cのみ対象）
-// ==========================================
-client.on('voiceStateUpdate', async (oldState, newState) => {
-    const roleTargetVcIds = TARGET_VC_IDS.slice(1, 4);
-
-    if (newState.channelId && roleTargetVcIds.includes(newState.channelId)) {
-        if (oldState.channelId !== newState.channelId) {
-            const member = newState.member;
-            if (member) {
-                try {
-                    await member.roles.add(TARGET_ROLE_ID);
-                    console.log(`🟢 ${member.user.tag} にロールを付与しました。`);
-                } catch (error) {
-                    console.error('ロール付与エラー:', error);
-                }
-            }
-        }
-    }
+    const roleFailureSummary = roleGrantFailures.length > 0
+        ? `\n⚠️ ロール付与失敗 ${roleGrantFailures.length} 人: ${roleGrantFailures.slice(0, 10).join('、')}${roleGrantFailures.length > 10 ? '、ほか' : ''}`
+        : '';
+    await sendTemporaryReply(`✅ **${successCount} 人**を **${roomName}** に移動しました。${skippedSummary}${roleFailureSummary}`);
 });
 
 // ==========================================
@@ -345,8 +347,17 @@ client.on('interactionCreate', async interaction => {
                 return interaction.editReply(`❌ ${targetUser.username} さんは現在VCに参加していません。`);
             }
 
+            const sourceChannelId = targetMember.voice.channel.id;
             await targetMember.voice.setChannel(TARGET_VC_IDS[roomIndex]);
-            await interaction.editReply(`✅ ${targetUser.username} さんを **${ROOM_NAMES[roomIndex]}** に移動させました。`);
+            const roleResult = await grantRoleAfterCommandMove(
+                targetMember,
+                sourceChannelId,
+                TARGET_VC_IDS[roomIndex]
+            );
+            const roleFailureMessage = roleResult === 'failed'
+                ? '\n⚠️ 移動は成功しましたが、ロール付与に失敗しました。'
+                : '';
+            await interaction.editReply(`✅ ${targetUser.username} さんを **${ROOM_NAMES[roomIndex]}** に移動させました。${roleFailureMessage}`);
         }
 
         // ▼ 複数ユーザー（メンション指定）を強制移動
@@ -366,6 +377,7 @@ client.on('interactionCreate', async interaction => {
 
             let successCount = 0;
             let errorMessages = [];
+            let roleGrantFailureCount = 0;
 
             for (const userId of userIds) {
                 try {
@@ -374,8 +386,15 @@ client.on('interactionCreate', async interaction => {
                         errorMessages.push(`⚠️ ${targetMember.user.username} さんはVC未参加のためスキップしました。`);
                         continue;
                     }
+                    const sourceChannelId = targetMember.voice.channel.id;
                     await targetMember.voice.setChannel(targetVcId);
                     successCount++;
+                    const roleResult = await grantRoleAfterCommandMove(
+                        targetMember,
+                        sourceChannelId,
+                        targetVcId
+                    );
+                    if (roleResult === 'failed') roleGrantFailureCount++;
                 } catch (error) {
                     errorMessages.push(`❌ ID ${userId} の移動に失敗しました。`);
                 }
@@ -383,6 +402,7 @@ client.on('interactionCreate', async interaction => {
 
             let replyText = `✅ **${successCount} 人** を **${ROOM_NAMES[roomIndex]}** に移動させました！`;
             if (errorMessages.length > 0) replyText += `\n${errorMessages.join('\n')}`;
+            if (roleGrantFailureCount > 0) replyText += `\n⚠️ ロール付与に失敗: ${roleGrantFailureCount} 人`;
             await interaction.editReply(replyText);
         }
 
@@ -437,18 +457,27 @@ client.on('interactionCreate', async interaction => {
 
                     let successCount = 0;
                     let skipCount = 0;
+                    let roleGrantFailureCount = 0;
 
                     for (const [memberId, member] of membersWithRole) {
                         if (!member.voice.channel) {
                             skipCount++;
                             continue;
                         }
+                        const sourceChannelId = member.voice.channel.id;
                         await member.voice.setChannel(targetVcId);
                         successCount++;
+                        const roleResult = await grantRoleAfterCommandMove(
+                            member,
+                            sourceChannelId,
+                            targetVcId
+                        );
+                        if (roleResult === 'failed') roleGrantFailureCount++;
                     }
 
                     let replyText = `✅ 「${targetRole.name}」ロールを持つ **${successCount} 人** を **${ROOM_NAMES[roomIndex]}** に移動させました！`;
                     if (skipCount > 0) replyText += `\n*(⚠️ VC未参加のため ${skipCount} 人はスキップしました)*`;
+                    if (roleGrantFailureCount > 0) replyText += `\n⚠️ ロール付与に失敗: ${roleGrantFailureCount} 人`;
 
                     await interaction.editReply({ content: replyText, components: [] });
 
