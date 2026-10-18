@@ -33,18 +33,18 @@ client.once('clientReady', (c) => {
 // ★ 設定エリア
 // ==========================================
 const TARGET_VC_IDS = [
-    '1558080487724027928',
-    '1558080778997600396', 
-    '1558080717303586926', 
-    '1558080848903934042'
+    '1397931691007283311',
+    '1561146595624489000', 
+    '1561146845172863176', 
+    '1561146943831277638'
 ];
-const TARGET_ROLE_ID = '1558085141090275358';
+const TARGET_ROLE_ID = '1558495948374544564';
 
-const ROOM_NAMES = ['一般', '部屋A', '部屋B', '部屋C'];
+const ROOM_NAMES = ['試合用VC①', '部屋A', '部屋B', '部屋C'];
 const ROLE_TARGET_VC_IDS = TARGET_VC_IDS.slice(1);
 
 // テキストコマンドの番号は、現在の設定配列の順序ではなく部屋名で解決する。
-const TEXT_COMMAND_ROOM_NAMES = ['一般', '部屋A', '部屋B', '部屋C'];
+const TEXT_COMMAND_ROOM_NAMES = ['試合用VC①', '部屋A', '部屋B', '部屋C'];
 
 async function grantRoleAfterCommandMove(member, sourceChannelId, targetChannelId) {
     if (sourceChannelId === targetChannelId || !ROLE_TARGET_VC_IDS.includes(targetChannelId)) {
@@ -98,7 +98,7 @@ client.on('messageCreate', async message => {
     const roomName = TEXT_COMMAND_ROOM_NAMES[Number(roomNumber)];
     const configuredRoomIndex = ROOM_NAMES.indexOf(roomName);
     if (!/^\d+$/.test(roomNumber ?? '') || configuredRoomIndex < 0) {
-        await sendTemporaryReply('❌ 部屋番号は 0（一般）、1（部屋A）、2（部屋B）、3（部屋C）で指定してください。');
+        await sendTemporaryReply('❌ 部屋番号は 0（試合用VC①）、1（部屋A）、2（部屋B）、3（部屋C）で指定してください。');
         return;
     }
 
@@ -178,7 +178,7 @@ client.on('interactionCreate', async interaction => {
             }
 
             if (!TARGET_VC_IDS.includes(interaction.channelId)) {
-                return interaction.editReply('❌ このコマンドは「一般」「部屋A」「部屋B」「部屋C」内でのみ使用できます。');
+                return interaction.editReply('❌ このコマンドは「試合用VC①」「部屋A」「部屋B」「部屋C」内でのみ使用できます。');
             }
 
             if (!interaction.memberPermissions?.has(PermissionFlagsBits.MuteMembers)) {
