@@ -2,7 +2,7 @@ require('dotenv').config();
 const { REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 const choices = [
-    { name: '一般', value: '0' },
+    { name: '試合用VC①', value: '0' },
     { name: '部屋A', value: '1' },
     { name: '部屋B', value: '2' },
     { name: '部屋C', value: '3' }
